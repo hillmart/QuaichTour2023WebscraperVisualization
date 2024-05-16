@@ -6,17 +6,17 @@ import math
 df = pd.read_csv("tournament_data.csv")
 
 # Filter out the Event line
-event_line = df[df['Division ID'].str.startswith("Event:")]
+event_lines = df[df['Division ID'].str.startswith("Event:")]
 df = df[~df['Division ID'].str.startswith("Event:")]
 
 # Calculate the total hole length for each player
 df['Total Hole Length'] = df[['Rd1 Last Hole Length', 'Rd2 Last Hole Length', 'Rd3 Last Hole Length']].sum(axis=1)
 
 # Assign the rank to each player
-df['rank'] = df.groupby('Total Hole Length')['Total'].rank(method='max', ascending=False)
+df['rank'] = df.groupby(['Event', 'Total Hole Length'])['Total'].rank(method='dense', ascending=False)
 
 # Get the maximum rank for each group
-max_ranks = df.groupby('Total Hole Length')['rank'].max().shift().fillna(0).cumsum()
+max_ranks = df.groupby(['Event', 'Total Hole Length'])['rank'].max().shift().fillna(0).cumsum()
 
 # Add the maximum rank of the previous group to the ranks of the current group
 df['rank'] += df['Total Hole Length'].map(max_ranks)
@@ -35,7 +35,6 @@ df = df.sort_values(by='Quaich Tour Points', ascending=False)
 # Save to new CSV file
 with open("tour_results.csv", "w") as f:
     f.write(",".join(df.columns) + "\n")
-    event_line = event_line.dropna(axis=1)
-    event_line_str = event_line.to_csv(header=False, index=False)
-    f.write(event_line_str)
+    event_lines_str = event_lines.to_csv(header=False, index=False)
+    f.write(event_lines_str)
     df.to_csv(f, header=False, index=False)

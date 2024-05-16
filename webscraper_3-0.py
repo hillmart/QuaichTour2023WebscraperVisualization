@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import csv
 import re
+import threading
 
 # List of tournament websites
 tournament_websites = [
@@ -25,14 +26,13 @@ tournament_websites = [
 ]
 
 # Create a CSV file to write to
-with open('tournament_results-2-0.csv', 'w', newline='') as f:
+with open('tournament_data.csv', 'w', newline='') as f:
     writer = csv.writer(f)
 
     # Write the header row
-    writer.writerow(['Division ID', 'Place', 'Points', 'Name', 'PDGA Number', 'Rating', 'Par', 'Rd1', 'Rd1 Rating', 'Rd1 Layout', 'Rd2', 'Rd2 Rating', 'Rd2 Layout', 'Rd3', 'Rd3 Rating', 'Rd3 Layout', 'Total'])
+    writer.writerow(['Division ID', 'Rd1 Layout', 'Rd2 Layout', 'Rd3 Layout', 'Place', 'Points', 'Name', 'PDGA Number', 'Rating', 'Par', 'Rd1', 'Rd2', 'Rd3', 'Rd1 Rating', 'Rd2 Rating', 'Rd3 Rating', 'Total'])
 
-    # Loop through each tournament website
-    for website in tournament_websites:
+    def scrape_tournament(website):
         # Make a request to the website
         r = requests.get(website)
 
@@ -54,26 +54,35 @@ with open('tournament_results-2-0.csv', 'w', newline='') as f:
             division_id = table.find_previous('h3').get('id')
             # Write the data rows
             for row in table.find_all('tr')[1:]:  # Skip the header row
-                data = [''] * 13  # Initialize data with 13 empty strings
+                data = [''] * 13  # Initialize data with 16 empty strings
                 columns = row.find_all('td')
-                for i, column in enumerate(columns):
-                    try:
-                        data[i] = column.text
-                    except IndexError:
-                        pass  # Do nothing if the index is out of range
-                place = data[0]
-                points = data[1]
-                name = data[2]
-                pdga_number = data[3]
-                rating = data[4]
-                par = data[5]
-                rd1 = data[6]
-                rd1_rating = data[7]
-                rd2 = data[8]
-                rd2_rating = data[9]
-                rd3 = data[10]
-                rd3_rating = data[11]
-                total = data[12]
+                for column in columns:
+                    if 'place' in column.get('class'):
+                        data[0] = column.text
+                    elif 'points' in column.get('class'):
+                        data[1] = column.text
+                    elif 'player' in column.get('class'):
+                        data[2] = column.text
+                    elif 'pdga-number' in column.get('class'):
+                        data[3] = column.text
+                    elif 'player-rating' in column.get('class'):
+                        data[4] = column.text
+                    elif 'par' in column.get('class'):
+                        data[5] = column.text
+                    elif 'round' in column.get('class'):
+                        for i in range(6, 9):
+                            if data[i] == '':
+                                data[i] = column.text
+                                break
+                    elif 'round-rating' in column.get('class'):
+                        for i in range(9, 12):
+                            if data[i] == '':
+                                data[i] = column.text
+                                break
+                    elif 'total' in column.get('class'):
+                        data[12] = column.text
+                        if data[12] == 'DNF':
+                            data[12] = '999'
 
                 # Find the layout details for each round
                 rd1_layout_span = soup.find('span', id=re.compile('^layout-details-'+website.split('/')[-1]+'-'+division_id+'-round-Rd1$'))
@@ -92,4 +101,13 @@ with open('tournament_results-2-0.csv', 'w', newline='') as f:
                 else:
                     rd3_layout = ''
 
-                writer.writerow([division_id, place, points, name, pdga_number, rating, par, rd1, rd1_rating, rd1_layout, rd2, rd2_rating, rd2_layout, rd3, rd3_rating, rd3_layout, total])
+                writer.writerow([division_id] + [rd1_layout, rd2_layout, rd3_layout] + data)
+
+    threads = []
+    for website in tournament_websites:
+        thread = threading.Thread(target=scrape_tournament, args=(website,))
+        threads.append(thread)
+        thread.start()
+
+    for thread in threads:
+        thread.join()
