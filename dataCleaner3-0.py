@@ -1,9 +1,14 @@
 import pandas as pd
 
 # Load the data
-df = pd.read_csv('tournament_results-4-0.csv')
+df = pd.read_csv('tournament_results-2-0.csv')
 
-# Fill missing values for Rd1, Rd2, Rd3 with 999
+# Fill missing values for Rd1, Rd2, Rd3 with 998 where RdX Layout is NaN
+df.loc[df['Rd1 Layout'].isna(), 'Rd1'] = 998
+df.loc[df['Rd2 Layout'].isna(), 'Rd2'] = 998
+df.loc[df['Rd3 Layout'].isna(), 'Rd3'] = 998
+
+# Fill any remaining missing values for Rd1, Rd2, Rd3 with 999
 df['Rd1'] = df['Rd1'].fillna(999)
 df['Rd2'] = df['Rd2'].fillna(999)
 df['Rd3'] = df['Rd3'].fillna(999)
@@ -33,16 +38,14 @@ for index, row in df.iterrows():
 
 
 # Fill missing values for Rd1 Last Hole Length
-df['Rd1 Last Hole Length'] = df.apply(lambda row: row['Rd2 Last Hole Length'] if pd.isna(row['Rd1 Last Hole Length']) else row['Rd1 Last Hole Length'], axis=1)
-df['Rd1 Last Hole Length'] = df.apply(lambda row: row['Rd3 Last Hole Length'] if pd.isna(row['Rd1 Last Hole Length']) else row['Rd1 Last Hole Length'], axis=1)
+min_hole_length = df[['Rd1 Last Hole Length', 'Rd2 Last Hole Length', 'Rd3 Last Hole Length']].min(axis = 1, skipna=True)
+df['Rd1 Last Hole Length'] = df['Rd1 Last Hole Length'].fillna(min_hole_length)
 
 # Fill missing values for Rd2 Last Hole Length
-df['Rd2 Last Hole Length'] = df.apply(lambda row: row['Rd1 Last Hole Length'] if pd.isna(row['Rd2 Last Hole Length']) else row['Rd2 Last Hole Length'], axis=1)
-df['Rd2 Last Hole Length'] = df.apply(lambda row: row['Rd3 Last Hole Length'] if pd.isna(row['Rd2 Last Hole Length']) else row['Rd2 Last Hole Length'], axis=1)
+df['Rd2 Last Hole Length'] = df['Rd2 Last Hole Length'].fillna(min_hole_length)
 
 # Fill missing values for Rd3 Last Hole Length
-df['Rd3 Last Hole Length'] = df.apply(lambda row: row['Rd1 Last Hole Length'] if pd.isna(row['Rd3 Last Hole Length']) else row['Rd3 Last Hole Length'], axis=1)
-df['Rd3 Last Hole Length'] = df.apply(lambda row: row['Rd2 Last Hole Length'] if pd.isna(row['Rd3 Last Hole Length']) else row['Rd3 Last Hole Length'], axis=1)
+df['Rd3 Last Hole Length'] = df['Rd3 Last Hole Length'].fillna(min_hole_length)
 
 # Remove rows where Division ID contains 'Event:' or 'Major:'
 df = df[~df['Division ID'].str.contains('Event:|Major:')]
